@@ -25,6 +25,8 @@
     --unset-dim: #EDF2F7;
     --radius: 12px;
     --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+    --admin-color: #4A5568;
+    --admin-bg: #EDF2F7;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -51,6 +53,19 @@
   .topbar-title .brand{
     font-size:11px; color:var(--orange-dim); font-weight:700; letter-spacing:1px; text-transform:uppercase;
   }
+  .role-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.2s;
+  }
+  .role-badge.tech { background: var(--orange); color: white; border-color: var(--orange); }
+  .role-badge.admin { background: #3182ce; color: white; border-color: #3182ce; }
+
   .datebar{
     display:flex; align-items:center; gap:8px; margin-top:12px;
   }
@@ -108,6 +123,19 @@
   .viewtab{ flex:1; text-align:center; padding:8px 6px; font-size:12.5px; font-weight:700; color:#cfd9e3; border-radius:7px; cursor:pointer; }
   .viewtab.active{ background:var(--orange); color:#fff; }
 
+  /* Admin Header Alert Banner */
+  .admin-banner {
+    background: #ebf8ff;
+    color: #2b6cb0;
+    border-bottom: 1px solid #bee3f8;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px 12px 4px; }
   .kpi-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
   .kpi-card .kval{ font-size:24px; font-weight:800; color:var(--navy); }
@@ -118,8 +146,19 @@
   .kpi-card.good .kval{ color:var(--on); }
 
   .chartcard{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); margin:12px; padding:16px; box-shadow:var(--shadow); }
-  .chartcard h3{ margin:0 0 10px; font-size:14px; font-weight:800; color:var(--navy); }
-  .chartcard .sub{ font-size:11px; color:var(--text-dim); margin:-6px 0 12px; }
+  .chartcard h3{ margin:0 0 4px; font-size:14px; font-weight:800; color:var(--navy); }
+  .chartcard .sub{ font-size:11px; color:var(--text-dim); margin:0 0 12px 0; }
+  .chart-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--navy);
+  }
 
   .summary{
     display:flex; justify-content:space-between; padding:12px 16px 4px; font-size:12px; color:var(--text-dim);
@@ -176,6 +215,12 @@
   .toggle[data-state="OFF"] .knob{ background:var(--off); }
   .toggle[data-state="ON"] .half.on, .toggle[data-state="OFF"] .half.off{ color:#fff; }
 
+  /* Read-Only Mode styling for Admin viewing tech data */
+  .readonly-mode .toggle {
+    cursor: not-allowed;
+    opacity: 0.85;
+  }
+
   .bottombar{
     position:fixed; left:0; right:0; bottom:0; z-index:50;
     background:var(--navy); color:#fff; padding:12px 16px;
@@ -219,9 +264,12 @@
   <div class="topbar-title">
     <div>
       <div class="brand">Versigent · M7N</div>
-      <h1>Suivi Climatisation ON/OFF</h1>
+      <h1>Suivi Climatisation</h1>
     </div>
+    <!-- Role Switcher -->
+    <div id="roleBadge" class="role-badge tech">Technicien</div>
   </div>
+  
   <div class="datebar">
     <button class="nav" id="prevDay">‹</button>
     <input type="date" id="datePicker">
@@ -236,10 +284,14 @@
     <div class="floortabs" id="floorTabs"></div>
   </div>
 
-  <div class="viewtabs">
+  <div class="viewtabs" id="navTabs">
     <div class="viewtab active" id="tabList">Suivi</div>
-    <div class="viewtab" id="tabDashboard">Dashboard</div>
+    <div class="viewtab" id="tabDashboard" style="display:none;">Dashboard (Admin)</div>
   </div>
+</div>
+
+<div class="admin-banner" id="adminBanner" style="display:none;">
+  <span>👁️ <b>Mode Consultation (Admin)</b> — Lecture seule pour contrôler le travail du technicien.</span>
 </div>
 
 <div class="summary" id="summaryBar"></div>
@@ -248,11 +300,30 @@
 
 <div id="dashboardView" style="display:none;">
   <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Improved Area / Zone View Dashboard Section -->
   <div class="chartcard">
-    <h3>Statut "Après" par étage</h3>
+    <h3>Analyse Détaillée par Zone (Area)</h3>
+    <div class="sub">Sélectionnez un étage et filtrez par zone pour voir son avancement</div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+      <select id="dashFloorSelect" class="chart-select">
+        <option value="ALL">Tous les étages</option>
+      </select>
+      <select id="dashZoneSelect" class="chart-select">
+        <option value="ALL">Toutes les zones</option>
+      </select>
+    </div>
+    
+    <div style="position:relative; height:200px;"><canvas id="areaChart"></canvas></div>
+  </div>
+
+  <div class="chartcard">
+    <h3>Statut "Après" global par étage</h3>
     <div class="sub" id="dashDateLabel"></div>
     <div style="position:relative; height:180px;"><canvas id="floorChart"></canvas></div>
   </div>
+  
   <div class="chartcard">
     <h3>Unités laissées ON — 7 derniers jours</h3>
     <div class="sub">Nombre d'unités toujours ON après le passage du technicien</div>
@@ -298,9 +369,10 @@ const FLOOR_LABELS = {
 let currentFloor = "ALL";
 let viewMode = "list"; // 'list' | 'dashboard'
 let searchQuery = "";
-let collapsedZones = {}; // State storage for expanded/collapsed sections
+let collapsedZones = {}; 
+let currentUserRole = "tech"; // 'tech' | 'admin'
 
-// --- Pure string date helpers (NO Date/toISOString round-trips -> no timezone drift) ---
+// --- Pure string date helpers ---
 function pad2(n){ return String(n).padStart(2,'0'); }
 function todayStr(){
   const d = new Date();
@@ -308,13 +380,13 @@ function todayStr(){
 }
 function addDaysStr(dateStr, delta){
   const [y,m,d] = dateStr.split('-').map(Number);
-  const dt = new Date(y, m-1, d, 12, 0, 0); // noon local, avoids DST edge cases
+  const dt = new Date(y, m-1, d, 12, 0, 0); 
   dt.setDate(dt.getDate()+delta);
   return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
 }
 
 let currentDate = todayStr();
-let dayData = {}; // { unitId: {avant:'ON'|'OFF'|null, apres:'ON'|'OFF'|null} }
+let dayData = {}; 
 
 function storageKey(d){ return "clim-status:"+d; }
 
@@ -338,6 +410,10 @@ async function loadDay(d){
 }
 
 function doSave(dateForSave, dataForSave){
+  if(currentUserRole === 'admin') {
+    // Admins are in read-only mode for safety during verification
+    return Promise.resolve(false);
+  }
   const key = storageKey(dateForSave);
   const dataStr = JSON.stringify(dataForSave);
   
@@ -368,11 +444,13 @@ function doSave(dateForSave, dataForSave){
 }
 
 async function scheduleSave(){
+  if(currentUserRole === 'admin') return;
   document.getElementById('saveStat').textContent = "Enregistrement…";
   await doSave(currentDate, dayData);
 }
 
 async function flushSave(){
+  if(currentUserRole === 'admin') return;
   await doSave(currentDate, dayData);
 }
 
@@ -390,6 +468,7 @@ function cycleState(cur){
 }
 
 function setState(unitId, field, val){
+  if(currentUserRole === 'admin') return; // Admins cannot edit data directly
   if(!dayData[unitId]) dayData[unitId] = {avant:null, apres:null};
   dayData[unitId][field] = val;
 }
@@ -436,8 +515,13 @@ function makeToggle(unitId, field, label){
   const state = dayData[unitId] ? dayData[unitId][field] : null;
   t.setAttribute('data-state', state || 'NONE');
   t.innerHTML = '<div class="half off">OFF</div><div class="half on">ON</div><div class="knob"></div>';
+  
   t.onclick = async (e)=>{
-    e.stopPropagation(); // Avoid triggering accordion collapse on tap
+    e.stopPropagation(); 
+    if(currentUserRole === 'admin') {
+      alert("Mode Consultation : Seul le technicien peut modifier les statuts.");
+      return;
+    }
     const cur = dayData[unitId] ? dayData[unitId][field] : null;
     const next = cycleState(cur);
     t.setAttribute('data-state', next || 'NONE');
@@ -468,7 +552,32 @@ function updateSummary() {
     `<span><b>${units.length}</b> unités</span><span><b>${on}</b> ON</span><span><b>${off}</b> OFF</span><span><b>${unset}</b> non relevés</span>`;
 }
 
-function render(){
+// Role toggle function
+document.getElementById('roleBadge').onclick = async () => {
+  await flushSave();
+  const badge = document.getElementById('roleBadge');
+  if(currentUserRole === 'tech') {
+    currentUserRole = 'admin';
+    badge.textContent = "Admin";
+    badge.className = "role-badge admin";
+    document.getElementById('tabDashboard').style.display = 'block';
+    document.getElementById('adminBanner').style.display = 'flex';
+    document.body.classList.add('readonly-mode');
+  } else {
+    currentUserRole = 'tech';
+    badge.textContent = "Technicien";
+    badge.className = "role-badge tech";
+    document.getElementById('tabDashboard').style.display = 'none';
+    document.getElementById('adminBanner').style.display = 'none';
+    document.body.classList.remove('readonly-mode');
+    if(viewMode === 'dashboard') {
+      viewMode = 'list';
+    }
+  }
+  render();
+};
+
+function render() {
   renderFloorTabs();
   document.getElementById('datePicker').value = currentDate;
 
@@ -489,7 +598,6 @@ function render(){
     units = units.filter(u=>u.floor===currentFloor);
   }
 
-  // Filter based on search input
   if(searchQuery.trim() !== "") {
     const q = searchQuery.toLowerCase();
     units = units.filter(u => 
@@ -525,7 +633,6 @@ function render(){
       </div>
     `;
     
-    // Toggle Collapse
     head.onclick = () => {
       const key = z.floor + "||" + z.zone;
       collapsedZones[key] = !collapsedZones[key];
@@ -561,7 +668,6 @@ function render(){
   updateSummary();
 }
 
-// Search Input handler
 document.getElementById('searchInput').oninput = (e) => {
   searchQuery = e.target.value;
   render();
@@ -621,7 +727,6 @@ document.getElementById('confirmExport').onclick = async () => {
 
     const allDayData = {};
     
-    // Recovery with localized fallback logic
     for(const dt of dates){
       if(dt === currentDate){
         allDayData[dt] = dayData; 
@@ -689,6 +794,7 @@ document.getElementById('confirmExport').onclick = async () => {
 
 let floorChartInstance = null;
 let trendChartInstance = null;
+let areaChartInstance = null;
 
 function computeKPIs(data){
   let total=0, avantOn=0, avantOff=0, apresOn=0, apresOff=0, unrelevedA=0, unrelevedP=0;
@@ -703,6 +809,101 @@ function computeKPIs(data){
   return {total, avantOn, avantOff, apresOn, apresOff, unrelevedA, unrelevedP};
 }
 
+// Populate dropdown selectors dynamically for Admin Area Dashboard
+function setupDashboardSelectors() {
+  const floorSel = document.getElementById('dashFloorSelect');
+  const zoneSel = document.getElementById('dashZoneSelect');
+  
+  // Save current values if they exist
+  const savedFloor = floorSel.value || "ALL";
+  const savedZone = zoneSel.value || "ALL";
+
+  floorSel.innerHTML = '<option value="ALL">Tous les étages</option>';
+  FLOOR_ORDER.forEach(f => {
+    floorSel.innerHTML += `<option value="${f}">${FLOOR_LABELS[f] || f}</option>`;
+  });
+  floorSel.value = savedFloor;
+
+  // Filter zones depending on chosen floor
+  let activeFloor = floorSel.value;
+  let filteredUnits = activeFloor === 'ALL' ? UNITS : UNITS.filter(u => u.floor === activeFloor);
+  
+  // Extract unique zones
+  const uniqueZones = [...new Set(filteredUnits.map(u => u.zone))].sort();
+  
+  zoneSel.innerHTML = '<option value="ALL">Toutes les zones (Areas)</option>';
+  uniqueZones.forEach(z => {
+    zoneSel.innerHTML += `<option value="${z}">${z}</option>`;
+  });
+  
+  if (uniqueZones.includes(savedZone)) {
+    zoneSel.value = savedZone;
+  } else {
+    zoneSel.value = "ALL";
+  }
+}
+
+document.getElementById('dashFloorSelect').onchange = () => {
+  setupDashboardSelectors();
+  renderAreaChart();
+};
+
+document.getElementById('dashZoneSelect').onchange = () => {
+  renderAreaChart();
+};
+
+function renderAreaChart() {
+  const selectedFloor = document.getElementById('dashFloorSelect').value;
+  const selectedZone = document.getElementById('dashZoneSelect').value;
+
+  // Filter unit checklist
+  let dataset = UNITS;
+  if(selectedFloor !== 'ALL') {
+    dataset = dataset.filter(u => u.floor === selectedFloor);
+  }
+  if(selectedZone !== 'ALL') {
+    dataset = dataset.filter(u => u.zone === selectedZone);
+  }
+
+  // Calculate statistics for the selection
+  let onCount = 0;
+  let offCount = 0;
+  let unsetCount = 0;
+
+  dataset.forEach(u => {
+    const v = dayData[u.id];
+    const p = v ? v.apres : null;
+    if(p === 'ON') onCount++;
+    else if(p === 'OFF') offCount++;
+    else unsetCount++;
+  });
+
+  const ctxArea = document.getElementById('areaChart').getContext('2d');
+  if(areaChartInstance) areaChartInstance.destroy();
+  
+  areaChartInstance = new Chart(ctxArea, {
+    type: 'doughnut',
+    data: {
+      labels: ['Laissées ON', 'Éteintes (OFF)', 'Non relevées'],
+      datasets: [{
+        data: [onCount, offCount, unsetCount],
+        backgroundColor: ['#C53030', '#2F855A', '#A0AEC0'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { boxWidth: 12, font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
 async function renderDashboard(){
   document.getElementById('dashDateLabel').textContent = "Journée du " + currentDate;
   const k = computeKPIs(dayData);
@@ -714,6 +915,10 @@ async function renderDashboard(){
     <div class="kpi-card ${k.apresOn>0?'alert':'good'}"><div class="kval">${k.apresOn}</div><div class="klabel">Laissées ON (Après)</div></div>
     <div class="kpi-card good"><div class="kval">${k.apresOff}</div><div class="klabel">Éteintes (Après)</div></div>
   `;
+
+  // Set up area selectors
+  setupDashboardSelectors();
+  renderAreaChart();
 
   const floorStats = {};
   FLOOR_ORDER.forEach(f=> floorStats[f] = {on:0, off:0, unset:0});
@@ -796,7 +1001,7 @@ document.getElementById('debugToggle').onclick = ()=>{
   updateDebug();
 };
 
-// init
+// Init app
 loadDay(currentDate);
 </script>
 </body>
