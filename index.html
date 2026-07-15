@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Suivi Climatisation — Versigent M7N</title>
+<!-- Firebase App (le cœur) et Realtime Database -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<!-- Autres librairies -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -25,8 +29,6 @@
     --unset-dim: #EDF2F7;
     --radius: 12px;
     --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-    --admin-color: #4A5568;
-    --admin-bg: #EDF2F7;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -82,9 +84,7 @@
   .datebar .today-btn{
     background:transparent; border:1px solid var(--orange); color:var(--orange-dim);
     padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;
-    transition: background 0.2s;
   }
-  .datebar .today-btn:hover{ background: rgba(255,107,53,0.1); }
   
   .filter-section{
     margin-top:12px;
@@ -106,7 +106,6 @@
     color: #fff;
     font-size: 13px;
   }
-  .search-input::placeholder{ color: #a0aec0; }
   
   .floortabs{
     display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;
@@ -123,7 +122,6 @@
   .viewtab{ flex:1; text-align:center; padding:8px 6px; font-size:12.5px; font-weight:700; color:#cfd9e3; border-radius:7px; cursor:pointer; }
   .viewtab.active{ background:var(--orange); color:#fff; }
 
-  /* Admin Header Alert Banner */
   .admin-banner {
     background: #ebf8ff;
     color: #2b6cb0;
@@ -139,7 +137,7 @@
   .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px 12px 4px; }
   .kpi-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
   .kpi-card .kval{ font-size:24px; font-weight:800; color:var(--navy); }
-  .kpi-card .klabel{ font-size:10.5px; color:var(--text-dim); font-weight:700; text-transform:uppercase; letter-spacing:.3px; margin-top:4px; }
+  .kpi-card .klabel{ font-size:10.5px; color:var(--text-dim); font-weight:700; text-transform:uppercase; margin-top:4px; }
   .kpi-card.alert{ border-left: 4px solid var(--off); }
   .kpi-card.alert .kval{ color:var(--off); }
   .kpi-card.good{ border-left: 4px solid var(--on); }
@@ -174,10 +172,10 @@
   .zonehead{
     padding:12px 14px; display:flex; align-items:center; justify-content:space-between;
     background: linear-gradient(180deg,#ffffff,#f7fafc); border-bottom:1px solid var(--line);
-    cursor:pointer; user-select: none;
+    cursor:pointer;
   }
   .zonehead .ztitle{ font-size:14px; font-weight:800; color: var(--navy); }
-  .zonehead .zmeta{ font-size:11px; color:var(--text-dim); margin-top:2px; font-weight: 500; }
+  .zonehead .zmeta{ font-size:11px; color:var(--text-dim); margin-top:2px; }
   .zonehead .zright { display: flex; align-items: center; gap: 8px; }
   .zonehead .zcount{ font-size:11px; color:var(--text-dim); font-weight:700; background: var(--bg); padding: 2px 8px; border-radius: 10px; }
   .zonehead .chevron { font-size: 14px; transition: transform 0.2s; color: var(--text-dim); }
@@ -186,20 +184,18 @@
 
   .unitrow{
     display:flex; align-items:center; justify-content:space-between;
-    padding:10px 14px; border-top:1px solid var(--line);
-    gap:10px; transition: background 0.15s;
+    padding:10px 14px; border-top:1px solid var(--line); gap:10px;
   }
-  .unitrow:hover { background-color: #fcfdfd; }
   .unitlabel{ font-size:13px; font-weight:600; color:var(--text); flex:1; min-width:0; }
   .unitlabel .sub{ display:block; font-size:11px; color:var(--text-dim); font-weight:500; margin-top:2px; }
 
   .switches{ display:flex; gap:10px; flex:0 0 auto; }
   .switchgroup{ display:flex; flex-direction:column; align-items:center; gap:3px; }
-  .switchgroup .lbl{ font-size:9px; color:var(--text-dim); font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+  .switchgroup .lbl{ font-size:9px; color:var(--text-dim); font-weight:700; text-transform:uppercase; }
   .toggle{
     width:70px; height:32px; border-radius:8px; border:1px solid var(--line);
     background:var(--unset-dim); position:relative; cursor:pointer; overflow:hidden;
-    display:flex; box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+    display:flex;
   }
   .toggle .half{
     flex:1; display:flex; align-items:center; justify-content:center;
@@ -209,17 +205,13 @@
   .toggle .knob{
     position:absolute; top:1px; bottom:1px; width:calc(50% - 1px); border-radius:7px;
     background:var(--unset); transition:transform .15s cubic-bezier(0.4, 0, 0.2, 1), background .15s ease;
-    left:1px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    left:1px;
   }
   .toggle[data-state="ON"] .knob{ transform:translateX(100%); background:var(--on); }
   .toggle[data-state="OFF"] .knob{ background:var(--off); }
   .toggle[data-state="ON"] .half.on, .toggle[data-state="OFF"] .half.off{ color:#fff; }
 
-  /* Read-Only Mode styling for Admin viewing tech data */
-  .readonly-mode .toggle {
-    cursor: not-allowed;
-    opacity: 0.85;
-  }
+  .readonly-mode .toggle { cursor: not-allowed; opacity: 0.85; }
 
   .bottombar{
     position:fixed; left:0; right:0; bottom:0; z-index:50;
@@ -230,32 +222,26 @@
   .savestat{ font-size:12px; color:#a9b8c6; font-weight: 500; }
   .btn{
     border:none; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:700; cursor:pointer;
-    transition: all 0.2s;
   }
   .btn.primary{ background:var(--orange); color:#fff; }
-  .btn.primary:active{ transform: scale(0.97); }
   .btn.ghost{ background:var(--navy-2); color:#fff; border:1px solid rgba(255,255,255,.15); }
-  .btn.ghost:active{ background: rgba(255,255,255,0.1); }
 
   .modal-overlay{
     position:fixed; inset:0; background:rgba(10,20,30,.7); z-index:100;
     display:none; align-items:flex-end; justify-content:center;
-    backdrop-filter: blur(2px);
   }
   .modal-overlay.open{ display:flex; }
   .modal{
     background:#fff; width:100%; max-width:480px; border-radius:16px 16px 0 0;
-    padding:20px 20px 24px; box-shadow: 0 -10px 25px rgba(0,0,0,0.2);
+    padding:20px 20px 24px;
   }
   .modal h2{ margin:0 0 6px; font-size:18px; color: var(--navy); }
   .modal p{ margin:0 0 16px; font-size:13px; color:var(--text-dim); }
   .modal label{ font-size:11.5px; font-weight:700; color:var(--text-dim); display:block; margin-bottom:6px; margin-top:12px; text-transform: uppercase; }
-  .modal input[type=date]{ width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); font-size:14px; color: var(--text); }
+  .modal input[type=date]{ width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); }
   .modal-actions{ display:flex; gap:10px; margin-top:20px; }
   .modal-actions .btn{ flex:1; }
-  .btn.close-x{ background:none; border:none; float:right; font-size:22px; color:var(--text-dim); cursor:pointer; padding:0; line-height: 1; }
-
-  .empty{ text-align:center; padding:40px 20px; color:var(--text-dim); font-size:14px; }
+  .btn.close-x{ background:none; border:none; float:right; font-size:22px; color:var(--text-dim); cursor:pointer; }
 </style>
 </head>
 <body>
@@ -266,7 +252,6 @@
       <div class="brand">Versigent · M7N</div>
       <h1>Suivi Climatisation</h1>
     </div>
-    <!-- Role Switcher -->
     <div id="roleBadge" class="role-badge tech">Technicien</div>
   </div>
   
@@ -291,7 +276,7 @@
 </div>
 
 <div class="admin-banner" id="adminBanner" style="display:none;">
-  <span>👁️ <b>Mode Consultation (Admin)</b> — Lecture seule pour contrôler le travail du technicien.</span>
+  <span>👁️ <b>Mode Consultation (Admin)</b> — Lecture seule en direct de Firebase.</span>
 </div>
 
 <div class="summary" id="summaryBar"></div>
@@ -301,11 +286,9 @@
 <div id="dashboardView" style="display:none;">
   <div class="kpi-grid" id="kpiGrid"></div>
 
-  <!-- Improved Area / Zone View Dashboard Section -->
   <div class="chartcard">
     <h3>Analyse Détaillée par Zone (Area)</h3>
     <div class="sub">Sélectionnez un étage et filtrez par zone pour voir son avancement</div>
-    
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
       <select id="dashFloorSelect" class="chart-select">
         <option value="ALL">Tous les étages</option>
@@ -314,7 +297,6 @@
         <option value="ALL">Toutes les zones</option>
       </select>
     </div>
-    
     <div style="position:relative; height:200px;"><canvas id="areaChart"></canvas></div>
   </div>
 
@@ -323,28 +305,22 @@
     <div class="sub" id="dashDateLabel"></div>
     <div style="position:relative; height:180px;"><canvas id="floorChart"></canvas></div>
   </div>
-  
-  <div class="chartcard">
-    <h3>Unités laissées ON — 7 derniers jours</h3>
-    <div class="sub">Nombre d'unités toujours ON après le passage du technicien</div>
-    <div style="position:relative; height:160px;"><canvas id="trendChart"></canvas></div>
-  </div>
 </div>
 
 <div class="bottombar">
-  <span class="savestat" id="saveStat">—</span>
+  <span class="savestat" id="saveStat">Initialisation Firebase...</span>
   <div style="display:flex; gap:8px;">
     <button class="btn ghost" id="debugToggle" style="padding:10px 12px;">🔍</button>
     <button class="btn ghost" id="exportBtn">Exporter Excel</button>
   </div>
 </div>
-<pre id="debugBox" style="display:none; position:fixed; left:8px; right:8px; bottom:60px; z-index:60; background:#111; color:#8f8; font-size:10px; padding:8px; border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap;"></pre>
+<pre id="debugBox" style="display:none; position:fixed; left:8px; right:8px; bottom:60px; z-index:60; background:#111; color:#8f8; font-size:10px; padding:8px; border-radius:8px; max-height:160px; overflow:auto;"></pre>
 
 <div class="modal-overlay" id="exportModal">
   <div class="modal">
     <button class="close-x" id="closeModal">×</button>
     <h2>Exporter le suivi</h2>
-    <p>Choisis la période à extraire au format Excel (mêmes colonnes que le fichier original).</p>
+    <p>Sélectionnez la période d'export.</p>
     <label>Du</label>
     <input type="date" id="exportFrom">
     <label>Au</label>
@@ -357,6 +333,7 @@
 </div>
 
 <script>
+// --- Base de données statique ---
 const UNITS = [{"floor": "RDC", "zone": "Hall coté DPM", "type": "Cassette", "idx": 1, "qty": 1, "id": "u1"}, {"floor": "RDC", "zone": "centre Medicale", "type": "Cassette", "idx": 1, "qty": 2, "id": "u2"}, {"floor": "RDC", "zone": "centre Medicale", "type": "Cassette", "idx": 2, "qty": 2, "id": "u3"}, {"floor": "RDC", "zone": "centre Medicale", "type": "Murale", "idx": 1, "qty": 1, "id": "u4"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 1, "qty": 6, "id": "u5"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 2, "qty": 6, "id": "u6"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 3, "qty": 6, "id": "u7"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 4, "qty": 6, "id": "u8"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 5, "qty": 6, "id": "u9"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 6, "qty": 6, "id": "u10"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 1, "qty": 6, "id": "u11"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 2, "qty": 6, "id": "u12"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 3, "qty": 6, "id": "u13"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 4, "qty": 6, "id": "u14"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 5, "qty": 6, "id": "u15"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 6, "qty": 6, "id": "u16"}, {"floor": "RDC", "zone": "Final Assembly", "type": "Cassette", "idx": 1, "qty": 3, "id": "u17"}, {"floor": "RDC", "zone": "Final Assembly", "type": "Cassette", "idx": 2, "qty": 3, "id": "u18"}, {"floor": "RDC", "zone": "Final Assembly", "type": "Cassette", "idx": 3, "qty": 3, "id": "u19"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 1, "qty": 5, "id": "u20"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 2, "qty": 5, "id": "u21"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 3, "qty": 5, "id": "u22"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 4, "qty": 5, "id": "u23"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 5, "qty": 5, "id": "u24"}, {"floor": "RDC", "zone": "Maintenance DEP", "type": "Cassette", "idx": 1, "qty": 3, "id": "u25"}, {"floor": "RDC", "zone": "Maintenance DEP", "type": "Cassette", "idx": 2, "qty": 3, "id": "u26"}, {"floor": "RDC", "zone": "Maintenance DEP", "type": "Cassette", "idx": 3, "qty": 3, "id": "u27"}, {"floor": "RDC", "zone": "La Mosqué d'homme", "type": "Cassette", "idx": 1, "qty": 3, "id": "u28"}, {"floor": "RDC", "zone": "La Mosqué d'homme", "type": "Cassette", "idx": 2, "qty": 3, "id": "u29"}, {"floor": "RDC", "zone": "La Mosqué d'homme", "type": "Cassette", "idx": 3, "qty": 3, "id": "u30"}, {"floor": "RDC", "zone": "La Mosqué de Femme", "type": "Cassette", "idx": 1, "qty": 1, "id": "u31"}, {"floor": "1er etage", "zone": "Salle d'exposition", "type": "Cassette", "idx": 1, "qty": 1, "id": "u32"}, {"floor": "1er etage", "zone": "IT DEP", "type": "Cassette", "idx": 1, "qty": 1, "id": "u33"}, {"floor": "1er etage", "zone": "Salle de validation", "type": "Cassette", "idx": 1, "qty": 2, "id": "u34"}, {"floor": "1er etage", "zone": "Salle de validation", "type": "Cassette", "idx": 2, "qty": 2, "id": "u35"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 1, "qty": 4, "id": "u36"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 2, "qty": 4, "id": "u37"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 3, "qty": 4, "id": "u38"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 4, "qty": 4, "id": "u39"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 1, "qty": 5, "id": "u40"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 2, "qty": 5, "id": "u41"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 3, "qty": 5, "id": "u42"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 4, "qty": 5, "id": "u43"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 5, "qty": 5, "id": "u44"}, {"floor": "1er etage", "zone": "salle IT (serveur)", "type": "Murale", "idx": 1, "qty": 2, "id": "u45"}, {"floor": "1er etage", "zone": "salle IT (serveur)", "type": "Murale", "idx": 2, "qty": 2, "id": "u46"}, {"floor": "1er etage", "zone": "Salle UPS", "type": "Murale", "idx": 1, "qty": 1, "id": "u47"}, {"floor": "1er etage", "zone": "Locale technique 1er etage", "type": "Murale", "idx": 1, "qty": 1, "id": "u48"}, {"floor": "1er etage", "zone": "salle Manager d'ingenieurie", "type": "Cassette", "idx": 1, "qty": 1, "id": "u49"}, {"floor": "1er etage", "zone": "salle de reunion 01", "type": "Cassette", "idx": 1, "qty": 1, "id": "u50"}, {"floor": "1er etage", "zone": "Zone de qualité", "type": "Cassette", "idx": 1, "qty": 3, "id": "u51"}, {"floor": "1er etage", "zone": "Zone de qualité", "type": "Cassette", "idx": 2, "qty": 3, "id": "u52"}, {"floor": "1er etage", "zone": "Zone de qualité", "type": "Cassette", "idx": 3, "qty": 3, "id": "u53"}, {"floor": "1er etage", "zone": "salle Manager de Qualité", "type": "Cassette", "idx": 1, "qty": 1, "id": "u54"}, {"floor": "1er etage", "zone": "Salle de reunion 02", "type": "Cassette", "idx": 1, "qty": 1, "id": "u55"}, {"floor": "1er etage", "zone": "Zone de Logistique", "type": "Cassette", "idx": 1, "qty": 2, "id": "u56"}, {"floor": "1er etage", "zone": "Zone de Logistique", "type": "Cassette", "idx": 2, "qty": 2, "id": "u57"}, {"floor": "1er etage", "zone": "salle Manager Logistique", "type": "Cassette", "idx": 1, "qty": 1, "id": "u58"}, {"floor": "1er etage", "zone": "Salle de reunion 03", "type": "Cassette", "idx": 1, "qty": 2, "id": "u59"}, {"floor": "1er etage", "zone": "Salle de reunion 03", "type": "Cassette", "idx": 2, "qty": 2, "id": "u60"}, {"floor": "1er etage", "zone": "Salle de reunion 04", "type": "Cassette", "idx": 1, "qty": 1, "id": "u61"}, {"floor": "1er etage", "zone": "Salle de reunion 05", "type": "Cassette", "idx": 1, "qty": 1, "id": "u62"}, {"floor": "1er etage", "zone": "salle de Finance", "type": "Cassette", "idx": 1, "qty": 1, "id": "u63"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 1, "qty": 5, "id": "u64"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 2, "qty": 5, "id": "u65"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 3, "qty": 5, "id": "u66"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 4, "qty": 5, "id": "u67"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 5, "qty": 5, "id": "u68"}, {"floor": "1er etage", "zone": "salle de Plant Manager", "type": "Cassette", "idx": 1, "qty": 1, "id": "u69"}, {"floor": "1er etage", "zone": "Salle de reunion general", "type": "Cassette", "idx": 1, "qty": 2, "id": "u70"}, {"floor": "1er etage", "zone": "Salle de reunion general", "type": "Cassette", "idx": 2, "qty": 2, "id": "u71"}, {"floor": "1er etage", "zone": "espace ouvert PM", "type": "Cassette", "idx": 1, "qty": 3, "id": "u72"}, {"floor": "1er etage", "zone": "espace ouvert PM", "type": "Cassette", "idx": 2, "qty": 3, "id": "u73"}, {"floor": "1er etage", "zone": "espace ouvert PM", "type": "Cassette", "idx": 3, "qty": 3, "id": "u74"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 1, "qty": 4, "id": "u75"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 2, "qty": 4, "id": "u76"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 3, "qty": 4, "id": "u77"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 4, "qty": 4, "id": "u78"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 1, "qty": 4, "id": "u79"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 2, "qty": 4, "id": "u80"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 3, "qty": 4, "id": "u81"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 4, "qty": 4, "id": "u82"}, {"floor": "Locale technique", "zone": "salle de coupe Maintenance", "type": "Murale", "idx": 1, "qty": 2, "id": "u83"}, {"floor": "Locale technique", "zone": "salle de coupe Maintenance", "type": "Murale", "idx": 2, "qty": 2, "id": "u84"}, {"floor": "Locale technique", "zone": "salle d'assemblage", "type": "Murale", "idx": 1, "qty": 2, "id": "u85"}, {"floor": "Locale technique", "zone": "salle d'assemblage", "type": "Murale", "idx": 2, "qty": 2, "id": "u86"}, {"floor": "Locale technique", "zone": "salle crimping", "type": "Murale", "idx": 1, "qty": 2, "id": "u87"}, {"floor": "Locale technique", "zone": "salle crimping", "type": "Murale", "idx": 2, "qty": 2, "id": "u88"}, {"floor": "magasin reception", "zone": "RDC", "type": "Cassette", "idx": 1, "qty": 1, "id": "u89"}, {"floor": "magasin reception", "zone": "Laboratoire de qualité", "type": "Cassette", "idx": 1, "qty": 1, "id": "u90"}, {"floor": "magasin reception", "zone": "teardown room", "type": "Cassette", "idx": 1, "qty": 1, "id": "u91"}, {"floor": "magasin reception", "zone": "Qualité inspection", "type": "Cassette", "idx": 1, "qty": 1, "id": "u92"}, {"floor": "magasin reception", "zone": "CCTV Room", "type": "Murale", "idx": 1, "qty": 1, "id": "u93"}, {"floor": "magasin reception", "zone": "representation des employers", "type": "Murale", "idx": 1, "qty": 1, "id": "u94"}, {"floor": "magasin reception", "zone": "Poste de garde 01", "type": "Murale", "idx": 1, "qty": 1, "id": "u95"}, {"floor": "magasin reception", "zone": "poste de garde 02", "type": "Murale", "idx": 1, "qty": 1, "id": "u96"}, {"floor": "magasin reception", "zone": "salle RH poste de garde", "type": "Murale", "idx": 1, "qty": 1, "id": "u97"}, {"floor": "magasin reception", "zone": "salle archivage zone annex", "type": "Murale", "idx": 1, "qty": 2, "id": "u98"}, {"floor": "magasin reception", "zone": "salle archivage zone annex", "type": "Murale", "idx": 2, "qty": 2, "id": "u99"}, {"floor": "magasin reception", "zone": "Dep. Expedition", "type": "Cassette", "idx": 1, "qty": 1, "id": "u100"}, {"floor": "magasin reception", "zone": "salle déchet de laverie", "type": "Murale", "idx": 1, "qty": 1, "id": "u101"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 1, "qty": 9, "id": "u102"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 2, "qty": 9, "id": "u103"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 3, "qty": 9, "id": "u104"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 4, "qty": 9, "id": "u105"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 5, "qty": 9, "id": "u106"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 6, "qty": 9, "id": "u107"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 7, "qty": 9, "id": "u108"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 8, "qty": 9, "id": "u109"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 9, "qty": 9, "id": "u110"}, {"floor": "Cuisine", "zone": "stockage cuisine", "type": "Murale", "idx": 1, "qty": 2, "id": "u111"}, {"floor": "Cuisine", "zone": "stockage cuisine", "type": "Murale", "idx": 2, "qty": 2, "id": "u112"}, {"floor": "TGBT", "zone": "TGBT", "type": "Murale", "idx": 1, "qty": 2, "id": "u113"}, {"floor": "TGBT", "zone": "TGBT", "type": "Murale", "idx": 2, "qty": 2, "id": "u114"}, {"floor": "Roof Tops", "zone": "RT01 – Reception", "type": "Rooftop", "idx": 1, "qty": null, "id": "u115"}, {"floor": "Roof Tops", "zone": "RT02 – T02", "type": "Rooftop", "idx": 1, "qty": null, "id": "u116"}, {"floor": "Roof Tops", "zone": "RT03 – T10", "type": "Rooftop", "idx": 1, "qty": null, "id": "u117"}, {"floor": "Roof Tops", "zone": "RT04 – T19", "type": "Rooftop", "idx": 1, "qty": null, "id": "u118"}, {"floor": "Roof Tops", "zone": "RT05 – T27", "type": "Rooftop", "idx": 1, "qty": null, "id": "u119"}, {"floor": "Roof Tops", "zone": "RT06 – A06", "type": "Rooftop", "idx": 1, "qty": null, "id": "u120"}, {"floor": "Roof Tops", "zone": "RT07 – A16", "type": "Rooftop", "idx": 1, "qty": null, "id": "u121"}, {"floor": "Roof Tops", "zone": "RT08 – A23", "type": "Rooftop", "idx": 1, "qty": null, "id": "u122"}, {"floor": "Roof Tops", "zone": "RT09 – A31", "type": "Rooftop", "idx": 1, "qty": null, "id": "u123"}, {"floor": "Roof Tops", "zone": "RT10 – Expédition", "type": "Rooftop", "idx": 1, "qty": null, "id": "u124"}, {"floor": "Roof Tops", "zone": "RT11 – Cantine", "type": "Rooftop", "idx": 1, "qty": null, "id": "u125"}, {"floor": "CTA", "zone": "Cuisine", "type": "CTA", "idx": 1, "qty": null, "id": "u126"}, {"floor": "CTA", "zone": "Produit chimie", "type": "CTA", "idx": 1, "qty": null, "id": "u127"}];
 
 const FLOOR_ORDER = ["RDC","1er etage","Locale technique","magasin reception","Cuisine","TGBT","Roof Tops","CTA"];
@@ -367,12 +344,12 @@ const FLOOR_LABELS = {
 };
 
 let currentFloor = "ALL";
-let viewMode = "list"; // 'list' | 'dashboard'
+let viewMode = "list"; 
 let searchQuery = "";
 let collapsedZones = {}; 
-let currentUserRole = "tech"; // 'tech' | 'admin'
+let currentUserRole = "tech"; 
 
-// --- Pure string date helpers ---
+// --- Dates ---
 function pad2(n){ return String(n).padStart(2,'0'); }
 function todayStr(){
   const d = new Date();
@@ -388,76 +365,63 @@ function addDaysStr(dateStr, delta){
 let currentDate = todayStr();
 let dayData = {}; 
 
-function storageKey(d){ return "clim-status:"+d; }
+// --- CONFIGURATION FIREBASE ---
+// TODO: REMPLACEZ CES VALEURS PAR LES VÔTRES !
+const firebaseConfig = {
+  apiKey: "VOTRE_API_KEY",
+  authDomain: "suivi-clim-m7n.firebaseapp.com",
+  databaseURL: "https://suivi-clim-m7n-default-rtdb.firebaseio.com", // C'est l'adresse qu'on voit sur votre photo !
+  projectId: "suivi-clim-m7n",
+  storageBucket: "suivi-clim-m7n.appspot.com",
+  messagingSenderId: "...",
+  appId: "..."
+};
 
-async function loadDay(d){
-  try{
-    if (window.storage && typeof window.storage.get === 'function') {
-      const res = await window.storage.get(storageKey(d), true);
-      dayData = res ? JSON.parse(res.value) : {};
-      document.getElementById('saveStat').textContent = res ? "Chargé" : "Aucune donnée enregistrée";
-    } else {
-      const localRes = localStorage.getItem(storageKey(d));
-      dayData = localRes ? JSON.parse(localRes) : {};
-      document.getElementById('saveStat').textContent = localRes ? "Chargé (Local)" : "Aucune donnée enregistrée";
-    }
-  }catch(e){
-    dayData = {};
-    document.getElementById('saveStat').textContent = "ℹ️ Nouveau jour";
+// Initialisation
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let currentDbRef = null;
+
+// Charger les données en temps réel depuis Firebase
+function listenToDay(dateStr) {
+  if (currentDbRef) {
+    currentDbRef.off(); // Arrêter l'écoute précédente
   }
-  render();
-  updateDebug();
+
+  document.getElementById('saveStat').textContent = "Connexion Firebase...";
+  currentDbRef = db.ref("suivi_clim/" + dateStr);
+
+  // ".on" écoute les modifications à la seconde près
+  currentDbRef.on("value", (snapshot) => {
+    dayData = snapshot.val() || {};
+    document.getElementById('saveStat').textContent = "Synchronisé (Firebase)";
+    render();
+    updateDebug();
+  }, (error) => {
+    console.error(error);
+    document.getElementById('saveStat').textContent = "Erreur de synchro Cloud";
+  });
 }
 
-function doSave(dateForSave, dataForSave){
-  if(currentUserRole === 'admin') {
-    // Admins are in read-only mode for safety during verification
-    return Promise.resolve(false);
-  }
-  const key = storageKey(dateForSave);
-  const dataStr = JSON.stringify(dataForSave);
+function saveToFirebase(unitId, field, val) {
+  if (currentUserRole === 'admin') return; // L'admin ne peut pas écraser par mégarde
   
-  if (window.storage && typeof window.storage.set === 'function') {
-    return window.storage.set(key, dataStr, true)
-      .then(()=>{
-        const now = new Date();
-        document.getElementById('saveStat').textContent = "Enregistré à " + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-        updateDebug();
-        return true;
-      })
-      .catch((e)=>{
-        document.getElementById('saveStat').textContent = "❌ Erreur de sauvegarde";
-        return false;
-      });
-  } else {
-    try {
-      localStorage.setItem(key, dataStr);
-      const now = new Date();
-      document.getElementById('saveStat').textContent = "Enregistré (Local) à " + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-      updateDebug();
-      return Promise.resolve(true);
-    } catch (e) {
-      document.getElementById('saveStat').textContent = "❌ Erreur de sauvegarde locale";
-      return Promise.resolve(false);
-    }
-  }
-}
-
-async function scheduleSave(){
-  if(currentUserRole === 'admin') return;
-  document.getElementById('saveStat').textContent = "Enregistrement…";
-  await doSave(currentDate, dayData);
-}
-
-async function flushSave(){
-  if(currentUserRole === 'admin') return;
-  await doSave(currentDate, dayData);
+  // Écrit directement sur le serveur Firebase
+  db.ref("suivi_clim/" + currentDate + "/" + unitId + "/" + field).set(val)
+    .then(() => {
+      document.getElementById('saveStat').textContent = "Enregistré dans le Cloud";
+    })
+    .catch((err) => {
+      console.error(err);
+      document.getElementById('saveStat').textContent = "Erreur d'écriture Cloud";
+    });
 }
 
 function updateDebug(){
   const el = document.getElementById('debugBox');
   if(el && el.style.display !== 'none'){
-    el.textContent = storageKey(currentDate) + "\n" + JSON.stringify(dayData, null, 1);
+    el.textContent = "Date: " + currentDate + "\nSource: Firebase Realtime Database\n" + JSON.stringify(dayData, null, 1);
   }
 }
 
@@ -465,12 +429,6 @@ function cycleState(cur){
   if(cur === null || cur === undefined) return 'ON';
   if(cur === 'ON') return 'OFF';
   return null;
-}
-
-function setState(unitId, field, val){
-  if(currentUserRole === 'admin') return; // Admins cannot edit data directly
-  if(!dayData[unitId]) dayData[unitId] = {avant:null, apres:null};
-  dayData[unitId][field] = val;
 }
 
 function groupUnits(units){
@@ -516,19 +474,15 @@ function makeToggle(unitId, field, label){
   t.setAttribute('data-state', state || 'NONE');
   t.innerHTML = '<div class="half off">OFF</div><div class="half on">ON</div><div class="knob"></div>';
   
-  t.onclick = async (e)=>{
+  t.onclick = (e)=>{
     e.stopPropagation(); 
     if(currentUserRole === 'admin') {
-      alert("Mode Consultation : Seul le technicien peut modifier les statuts.");
+      alert("Mode Consultation (Admin) : Lecture seule. Seul le technicien sur le terrain peut modifier.");
       return;
     }
     const cur = dayData[unitId] ? dayData[unitId][field] : null;
     const next = cycleState(cur);
-    t.setAttribute('data-state', next || 'NONE');
-    setState(unitId, field, next);
-    updateDebug();
-    await scheduleSave();
-    updateSummary();
+    saveToFirebase(unitId, field, next);
   };
   group.appendChild(lbl);
   group.appendChild(t);
@@ -552,9 +506,8 @@ function updateSummary() {
     `<span><b>${units.length}</b> unités</span><span><b>${on}</b> ON</span><span><b>${off}</b> OFF</span><span><b>${unset}</b> non relevés</span>`;
 }
 
-// Role toggle function
-document.getElementById('roleBadge').onclick = async () => {
-  await flushSave();
+// Changement de Rôle
+document.getElementById('roleBadge').onclick = () => {
   const badge = document.getElementById('roleBadge');
   if(currentUserRole === 'tech') {
     currentUserRole = 'admin';
@@ -570,9 +523,7 @@ document.getElementById('roleBadge').onclick = async () => {
     document.getElementById('tabDashboard').style.display = 'none';
     document.getElementById('adminBanner').style.display = 'none';
     document.body.classList.remove('readonly-mode');
-    if(viewMode === 'dashboard') {
-      viewMode = 'list';
-    }
+    if(viewMode === 'dashboard') viewMode = 'list';
   }
   render();
 };
@@ -673,28 +624,24 @@ document.getElementById('searchInput').oninput = (e) => {
   render();
 };
 
-document.getElementById('prevDay').onclick = async ()=>{
-  await flushSave();
+document.getElementById('prevDay').onclick = ()=>{
   currentDate = addDaysStr(currentDate, -1);
-  loadDay(currentDate);
+  listenToDay(currentDate);
 };
-document.getElementById('nextDay').onclick = async ()=>{
-  await flushSave();
+document.getElementById('nextDay').onclick = ()=>{
   currentDate = addDaysStr(currentDate, 1);
-  loadDay(currentDate);
+  listenToDay(currentDate);
 };
-document.getElementById('todayBtn').onclick = async ()=>{
-  await flushSave();
+document.getElementById('todayBtn').onclick = ()=>{
   currentDate = todayStr();
-  loadDay(currentDate);
+  listenToDay(currentDate);
 };
-document.getElementById('datePicker').onchange = async (e)=>{
-  await flushSave();
+document.getElementById('datePicker').onchange = (e)=>{
   currentDate = e.target.value;
-  loadDay(currentDate);
+  listenToDay(currentDate);
 };
 
-// ---- Export ----
+// ---- Export Excel ----
 document.getElementById('exportBtn').onclick = ()=>{
   document.getElementById('exportFrom').value = currentDate;
   document.getElementById('exportTo').value = currentDate;
@@ -706,18 +653,13 @@ document.getElementById('cancelExport').onclick = ()=> document.getElementById('
 document.getElementById('confirmExport').onclick = async () => {
   const from = document.getElementById('exportFrom').value;
   const to = document.getElementById('exportTo').value;
-  if(!from || !to || from > to){ 
-    alert('Période invalide.'); 
-    return; 
-  }
+  if(!from || !to || from > to){ alert('Période invalide.'); return; }
 
   const confirmBtn = document.getElementById('confirmExport');
-  confirmBtn.textContent = 'Préparation…';
+  confirmBtn.textContent = 'Téléchargement...';
   confirmBtn.disabled = true;
 
   try {
-    await flushSave(); 
-
     const dates = [];
     let d = from;
     while(d <= to){
@@ -726,33 +668,10 @@ document.getElementById('confirmExport').onclick = async () => {
     }
 
     const allDayData = {};
-    
     for(const dt of dates){
-      if(dt === currentDate){
-        allDayData[dt] = dayData; 
-        continue;
-      }
-      
-      let parsed = {};
-      const key = storageKey(dt);
-      
-      try {
-        if (window.storage && typeof window.storage.get === 'function') {
-          const res = await window.storage.get(key, true);
-          if (res) {
-            parsed = typeof res.value === 'string' ? JSON.parse(res.value) : (res.value || {});
-          }
-        } else {
-          const localRes = localStorage.getItem(key);
-          if (localRes) {
-            parsed = JSON.parse(localRes);
-          }
-        }
-      } catch(e) {
-        console.warn(`Impossible de charger les données pour le ${dt}:`, e);
-        parsed = {}; 
-      }
-      allDayData[dt] = parsed;
+      // Téléchargement unique des données historiques sur Firebase
+      const snap = await db.ref("suivi_clim/" + dt).once("value");
+      allDayData[dt] = snap.val() || {};
     }
 
     const row1 = ['', '', '', ''];
@@ -778,13 +697,11 @@ document.getElementById('confirmExport').onclick = async () => {
     ws['!cols'] = [{wch: 16}, {wch: 26}, {wch: 12}, {wch: 10}].concat(dates.flatMap(() => [{wch: 8}, {wch: 8}]));
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Suivi des climes');
-    const fname = `Suivi_Climatisation_${from}_a_${to}.xlsx`;
-    XLSX.writeFile(wb, fname);
+    XLSX.utils.book_append_sheet(wb, ws, 'Suivi');
+    XLSX.writeFile(wb, `Suivi_Climatisation_${from}_a_${to}.xlsx`);
 
   } catch(err) {
-    console.error(err);
-    alert('Erreur pendant l\'export : ' + (err && err.message ? err.message : 'Problème inconnu'));
+    alert('Erreur pendant l\'export : ' + err.message);
   } finally {
     confirmBtn.textContent = 'Télécharger';
     confirmBtn.disabled = false;
@@ -793,7 +710,6 @@ document.getElementById('confirmExport').onclick = async () => {
 };
 
 let floorChartInstance = null;
-let trendChartInstance = null;
 let areaChartInstance = null;
 
 function computeKPIs(data){
@@ -809,12 +725,10 @@ function computeKPIs(data){
   return {total, avantOn, avantOff, apresOn, apresOff, unrelevedA, unrelevedP};
 }
 
-// Populate dropdown selectors dynamically for Admin Area Dashboard
 function setupDashboardSelectors() {
   const floorSel = document.getElementById('dashFloorSelect');
   const zoneSel = document.getElementById('dashZoneSelect');
   
-  // Save current values if they exist
   const savedFloor = floorSel.value || "ALL";
   const savedZone = zoneSel.value || "ALL";
 
@@ -824,14 +738,12 @@ function setupDashboardSelectors() {
   });
   floorSel.value = savedFloor;
 
-  // Filter zones depending on chosen floor
   let activeFloor = floorSel.value;
   let filteredUnits = activeFloor === 'ALL' ? UNITS : UNITS.filter(u => u.floor === activeFloor);
   
-  // Extract unique zones
   const uniqueZones = [...new Set(filteredUnits.map(u => u.zone))].sort();
   
-  zoneSel.innerHTML = '<option value="ALL">Toutes les zones (Areas)</option>';
+  zoneSel.innerHTML = '<option value="ALL">Toutes les zones</option>';
   uniqueZones.forEach(z => {
     zoneSel.innerHTML += `<option value="${z}">${z}</option>`;
   });
@@ -856,20 +768,11 @@ function renderAreaChart() {
   const selectedFloor = document.getElementById('dashFloorSelect').value;
   const selectedZone = document.getElementById('dashZoneSelect').value;
 
-  // Filter unit checklist
   let dataset = UNITS;
-  if(selectedFloor !== 'ALL') {
-    dataset = dataset.filter(u => u.floor === selectedFloor);
-  }
-  if(selectedZone !== 'ALL') {
-    dataset = dataset.filter(u => u.zone === selectedZone);
-  }
+  if(selectedFloor !== 'ALL') dataset = dataset.filter(u => u.floor === selectedFloor);
+  if(selectedZone !== 'ALL') dataset = dataset.filter(u => u.zone === selectedZone);
 
-  // Calculate statistics for the selection
-  let onCount = 0;
-  let offCount = 0;
-  let unsetCount = 0;
-
+  let onCount = 0, offCount = 0, unsetCount = 0;
   dataset.forEach(u => {
     const v = dayData[u.id];
     const p = v ? v.apres : null;
@@ -894,17 +797,12 @@ function renderAreaChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { boxWidth: 12, font: { size: 11 } }
-        }
-      }
+      plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } }
     }
   });
 }
 
-async function renderDashboard(){
+function renderDashboard(){
   document.getElementById('dashDateLabel').textContent = "Journée du " + currentDate;
   const k = computeKPIs(dayData);
 
@@ -916,7 +814,6 @@ async function renderDashboard(){
     <div class="kpi-card good"><div class="kval">${k.apresOff}</div><div class="klabel">Éteintes (Après)</div></div>
   `;
 
-  // Set up area selectors
   setupDashboardSelectors();
   renderAreaChart();
 
@@ -930,6 +827,7 @@ async function renderDashboard(){
     else if(p==='OFF') floorStats[u.floor].off++;
     else floorStats[u.floor].unset++;
   });
+  
   const floorLabels = FLOOR_ORDER.map(f=> FLOOR_LABELS[f]||f);
   const onData = FLOOR_ORDER.map(f=> floorStats[f].on);
   const offData = FLOOR_ORDER.map(f=> floorStats[f].off);
@@ -954,42 +852,6 @@ async function renderDashboard(){
       scales:{ x:{stacked:true, ticks:{font:{size:9}}}, y:{stacked:true, beginAtZero:true, ticks:{precision:0}} }
     }
   });
-
-  const trendDates = [];
-  for(let i=6;i>=0;i--) trendDates.push(addDaysStr(currentDate, -i));
-  const trendCounts = [];
-  for(const dt of trendDates){
-    let data = {};
-    if(dt===currentDate){ data = dayData; }
-    else{
-      try {
-        if (window.storage && typeof window.storage.get === 'function') {
-          const res = await window.storage.get(storageKey(dt), true);
-          data = res ? JSON.parse(res.value) : {};
-        } else {
-          const localRes = localStorage.getItem(storageKey(dt));
-          data = localRes ? JSON.parse(localRes) : {};
-        }
-      } catch(e) { data = {}; }
-    }
-    const kk = computeKPIs(data);
-    trendCounts.push(kk.apresOn);
-  }
-  const ctxTrend = document.getElementById('trendChart').getContext('2d');
-  if(trendChartInstance) trendChartInstance.destroy();
-  trendChartInstance = new Chart(ctxTrend, {
-    type:'bar',
-    data:{
-      labels: trendDates.map(d=>d.slice(5)),
-      datasets:[{ label:'Laissées ON', data: trendCounts, backgroundColor:'#FF6B35' }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio: false,
-      plugins:{ legend:{ display:false } },
-      scales:{ y:{ beginAtZero:true, ticks:{precision:0} } }
-    }
-  });
 }
 
 document.getElementById('tabList').onclick = ()=>{ viewMode='list'; render(); };
@@ -1001,8 +863,8 @@ document.getElementById('debugToggle').onclick = ()=>{
   updateDebug();
 };
 
-// Init app
-loadDay(currentDate);
+// Initialisation au chargement
+listenToDay(currentDate);
 </script>
 </body>
 </html>
