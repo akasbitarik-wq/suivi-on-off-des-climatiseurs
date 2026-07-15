@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Suivi Climatisation — Versigent M7N</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy: #0F2537;
+    --navy-2: #1A365D;
+    --orange: #FF6B35;
+    --orange-dim: #FFD2C1;
+    --bg: #F4F7F6;
+    --card: #FFFFFF;
+    --line: #E2E8F0;
+    --text: #2D3748;
+    --text-dim: #718096;
+    --on: #2F855A;
+    --on-dim: #C6F6D5;
+    --off: #C53030;
+    --off-dim: #FED7D7;
+    --unset: #A0AEC0;
+    --unset-dim: #EDF2F7;
+    --radius: 12px;
+    --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:100px;
+  }
+  .topbar{
+    position:sticky; top:0; z-index:50;
+    background:var(--navy);
+    color:#fff;
+    padding:16px 16px 12px;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+  }
+  .topbar-title{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .topbar-title h1{
+    font-size:18px; margin:0; letter-spacing:.2px; font-weight:800;
+  }
+  .topbar-title .brand{
+    font-size:11px; color:var(--orange-dim); font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  }
+  .datebar{
+    display:flex; align-items:center; gap:8px; margin-top:12px;
+  }
+  .datebar button.nav{
+    background:var(--navy-2); border:1px solid rgba(255,255,255,.15); color:#fff;
+    width:38px; height:38px; border-radius:8px; font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition: background 0.2s;
+  }
+  .datebar button.nav:active{background:var(--orange);}
+  .datebar input[type=date]{
+    flex:1; background:var(--navy-2); border:1px solid rgba(255,255,255,.15); color:#fff;
+    padding:8px 10px; border-radius:8px; font-size:14px; font-weight:600; text-align:center;
+  }
+  .datebar .today-btn{
+    background:transparent; border:1px solid var(--orange); color:var(--orange-dim);
+    padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;
+    transition: background 0.2s;
+  }
+  .datebar .today-btn:hover{ background: rgba(255,107,53,0.1); }
+  
+  .filter-section{
+    margin-top:12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: var(--navy-2);
+    color: #fff;
+    font-size: 13px;
+  }
+  .search-input::placeholder{ color: #a0aec0; }
+  
+  .floortabs{
+    display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;
+    scrollbar-width:none;
+  }
+  .floortabs::-webkit-scrollbar{display:none;}
+  .floortab{
+    flex:0 0 auto; background:var(--navy-2); color:#cfd9e3; border:1px solid rgba(255,255,255,.1);
+    padding:7px 14px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;
+  }
+  .floortab.active{ background:var(--orange); color:#fff; border-color:var(--orange); }
+
+  .viewtabs{ display:flex; gap:4px; margin-top:12px; background:var(--navy-2); border-radius:9px; padding:3px; }
+  .viewtab{ flex:1; text-align:center; padding:8px 6px; font-size:12.5px; font-weight:700; color:#cfd9e3; border-radius:7px; cursor:pointer; }
+  .viewtab.active{ background:var(--orange); color:#fff; }
+
+  .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px 12px 4px; }
+  .kpi-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
+  .kpi-card .kval{ font-size:24px; font-weight:800; color:var(--navy); }
+  .kpi-card .klabel{ font-size:10.5px; color:var(--text-dim); font-weight:700; text-transform:uppercase; letter-spacing:.3px; margin-top:4px; }
+  .kpi-card.alert{ border-left: 4px solid var(--off); }
+  .kpi-card.alert .kval{ color:var(--off); }
+  .kpi-card.good{ border-left: 4px solid var(--on); }
+  .kpi-card.good .kval{ color:var(--on); }
+
+  .chartcard{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); margin:12px; padding:16px; box-shadow:var(--shadow); }
+  .chartcard h3{ margin:0 0 10px; font-size:14px; font-weight:800; color:var(--navy); }
+  .chartcard .sub{ font-size:11px; color:var(--text-dim); margin:-6px 0 12px; }
+
+  .summary{
+    display:flex; justify-content:space-between; padding:12px 16px 4px; font-size:12px; color:var(--text-dim);
+  }
+  .summary b{ color:var(--text); }
+
+  .content{ padding:8px 12px 12px; }
+
+  .zonecard{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:12px; overflow:hidden; box-shadow:var(--shadow);
+  }
+  .zonehead{
+    padding:12px 14px; display:flex; align-items:center; justify-content:space-between;
+    background: linear-gradient(180deg,#ffffff,#f7fafc); border-bottom:1px solid var(--line);
+    cursor:pointer; user-select: none;
+  }
+  .zonehead .ztitle{ font-size:14px; font-weight:800; color: var(--navy); }
+  .zonehead .zmeta{ font-size:11px; color:var(--text-dim); margin-top:2px; font-weight: 500; }
+  .zonehead .zright { display: flex; align-items: center; gap: 8px; }
+  .zonehead .zcount{ font-size:11px; color:var(--text-dim); font-weight:700; background: var(--bg); padding: 2px 8px; border-radius: 10px; }
+  .zonehead .chevron { font-size: 14px; transition: transform 0.2s; color: var(--text-dim); }
+  .zonecard.collapsed .chevron { transform: rotate(-90deg); }
+  .zonecard.collapsed .zonebody { display: none; }
+
+  .unitrow{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; border-top:1px solid var(--line);
+    gap:10px; transition: background 0.15s;
+  }
+  .unitrow:hover { background-color: #fcfdfd; }
+  .unitlabel{ font-size:13px; font-weight:600; color:var(--text); flex:1; min-width:0; }
+  .unitlabel .sub{ display:block; font-size:11px; color:var(--text-dim); font-weight:500; margin-top:2px; }
+
+  .switches{ display:flex; gap:10px; flex:0 0 auto; }
+  .switchgroup{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .switchgroup .lbl{ font-size:9px; color:var(--text-dim); font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+  .toggle{
+    width:70px; height:32px; border-radius:8px; border:1px solid var(--line);
+    background:var(--unset-dim); position:relative; cursor:pointer; overflow:hidden;
+    display:flex; box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .toggle .half{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:800; color:var(--text-dim); z-index:1;
+    user-select: none;
+  }
+  .toggle .knob{
+    position:absolute; top:1px; bottom:1px; width:calc(50% - 1px); border-radius:7px;
+    background:var(--unset); transition:transform .15s cubic-bezier(0.4, 0, 0.2, 1), background .15s ease;
+    left:1px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .toggle[data-state="ON"] .knob{ transform:translateX(100%); background:var(--on); }
+  .toggle[data-state="OFF"] .knob{ background:var(--off); }
+  .toggle[data-state="ON"] .half.on, .toggle[data-state="OFF"] .half.off{ color:#fff; }
+
+  .bottombar{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:var(--navy); color:#fff; padding:12px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    box-shadow:0 -4px 12px rgba(0,0,0,.15);
+  }
+  .savestat{ font-size:12px; color:#a9b8c6; font-weight: 500; }
+  .btn{
+    border:none; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:700; cursor:pointer;
+    transition: all 0.2s;
+  }
+  .btn.primary{ background:var(--orange); color:#fff; }
+  .btn.primary:active{ transform: scale(0.97); }
+  .btn.ghost{ background:var(--navy-2); color:#fff; border:1px solid rgba(255,255,255,.15); }
+  .btn.ghost:active{ background: rgba(255,255,255,0.1); }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(10,20,30,.7); z-index:100;
+    display:none; align-items:flex-end; justify-content:center;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:#fff; width:100%; max-width:480px; border-radius:16px 16px 0 0;
+    padding:20px 20px 24px; box-shadow: 0 -10px 25px rgba(0,0,0,0.2);
+  }
+  .modal h2{ margin:0 0 6px; font-size:18px; color: var(--navy); }
+  .modal p{ margin:0 0 16px; font-size:13px; color:var(--text-dim); }
+  .modal label{ font-size:11.5px; font-weight:700; color:var(--text-dim); display:block; margin-bottom:6px; margin-top:12px; text-transform: uppercase; }
+  .modal input[type=date]{ width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); font-size:14px; color: var(--text); }
+  .modal-actions{ display:flex; gap:10px; margin-top:20px; }
+  .modal-actions .btn{ flex:1; }
+  .btn.close-x{ background:none; border:none; float:right; font-size:22px; color:var(--text-dim); cursor:pointer; padding:0; line-height: 1; }
+
+  .empty{ text-align:center; padding:40px 20px; color:var(--text-dim); font-size:14px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">
+    <div>
+      <div class="brand">Versigent · M7N</div>
+      <h1>Suivi Climatisation ON/OFF</h1>
+    </div>
+  </div>
+  <div class="datebar">
+    <button class="nav" id="prevDay">‹</button>
+    <input type="date" id="datePicker">
+    <button class="nav" id="nextDay">›</button>
+    <button class="today-btn" id="todayBtn">Aujourd'hui</button>
+  </div>
+  
+  <div class="filter-section" id="filterSection">
+    <div class="search-wrapper">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Rechercher une zone, un type...">
+    </div>
+    <div class="floortabs" id="floorTabs"></div>
+  </div>
+
+  <div class="viewtabs">
+    <div class="viewtab active" id="tabList">Suivi</div>
+    <div class="viewtab" id="tabDashboard">Dashboard</div>
+  </div>
+</div>
+
+<div class="summary" id="summaryBar"></div>
+
+<div class="content" id="content"></div>
+
+<div id="dashboardView" style="display:none;">
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div class="chartcard">
+    <h3>Statut "Après" par étage</h3>
+    <div class="sub" id="dashDateLabel"></div>
+    <div style="position:relative; height:180px;"><canvas id="floorChart"></canvas></div>
+  </div>
+  <div class="chartcard">
+    <h3>Unités laissées ON — 7 derniers jours</h3>
+    <div class="sub">Nombre d'unités toujours ON après le passage du technicien</div>
+    <div style="position:relative; height:160px;"><canvas id="trendChart"></canvas></div>
+  </div>
+</div>
+
+<div class="bottombar">
+  <span class="savestat" id="saveStat">—</span>
+  <div style="display:flex; gap:8px;">
+    <button class="btn ghost" id="debugToggle" style="padding:10px 12px;">🔍</button>
+    <button class="btn ghost" id="exportBtn">Exporter Excel</button>
+  </div>
+</div>
+<pre id="debugBox" style="display:none; position:fixed; left:8px; right:8px; bottom:60px; z-index:60; background:#111; color:#8f8; font-size:10px; padding:8px; border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap;"></pre>
+
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <button class="close-x" id="closeModal">×</button>
+    <h2>Exporter le suivi</h2>
+    <p>Choisis la période à extraire au format Excel (mêmes colonnes que le fichier original).</p>
+    <label>Du</label>
+    <input type="date" id="exportFrom">
+    <label>Au</label>
+    <input type="date" id="exportTo">
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelExport">Annuler</button>
+      <button class="btn primary" id="confirmExport">Télécharger</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const UNITS = [{"floor": "RDC", "zone": "Hall coté DPM", "type": "Cassette", "idx": 1, "qty": 1, "id": "u1"}, {"floor": "RDC", "zone": "centre Medicale", "type": "Cassette", "idx": 1, "qty": 2, "id": "u2"}, {"floor": "RDC", "zone": "centre Medicale", "type": "Cassette", "idx": 2, "qty": 2, "id": "u3"}, {"floor": "RDC", "zone": "centre Medicale", "type": "Murale", "idx": 1, "qty": 1, "id": "u4"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 1, "qty": 6, "id": "u5"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 2, "qty": 6, "id": "u6"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 3, "qty": 6, "id": "u7"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 4, "qty": 6, "id": "u8"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 5, "qty": 6, "id": "u9"}, {"floor": "RDC", "zone": "RH", "type": "Cassette", "idx": 6, "qty": 6, "id": "u10"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 1, "qty": 6, "id": "u11"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 2, "qty": 6, "id": "u12"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 3, "qty": 6, "id": "u13"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 4, "qty": 6, "id": "u14"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 5, "qty": 6, "id": "u15"}, {"floor": "RDC", "zone": "Centre de formation", "type": "Cassette", "idx": 6, "qty": 6, "id": "u16"}, {"floor": "RDC", "zone": "Final Assembly", "type": "Cassette", "idx": 1, "qty": 3, "id": "u17"}, {"floor": "RDC", "zone": "Final Assembly", "type": "Cassette", "idx": 2, "qty": 3, "id": "u18"}, {"floor": "RDC", "zone": "Final Assembly", "type": "Cassette", "idx": 3, "qty": 3, "id": "u19"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 1, "qty": 5, "id": "u20"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 2, "qty": 5, "id": "u21"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 3, "qty": 5, "id": "u22"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 4, "qty": 5, "id": "u23"}, {"floor": "RDC", "zone": "Cutting DEP", "type": "Cassette", "idx": 5, "qty": 5, "id": "u24"}, {"floor": "RDC", "zone": "Maintenance DEP", "type": "Cassette", "idx": 1, "qty": 3, "id": "u25"}, {"floor": "RDC", "zone": "Maintenance DEP", "type": "Cassette", "idx": 2, "qty": 3, "id": "u26"}, {"floor": "RDC", "zone": "Maintenance DEP", "type": "Cassette", "idx": 3, "qty": 3, "id": "u27"}, {"floor": "RDC", "zone": "La Mosqué d'homme", "type": "Cassette", "idx": 1, "qty": 3, "id": "u28"}, {"floor": "RDC", "zone": "La Mosqué d'homme", "type": "Cassette", "idx": 2, "qty": 3, "id": "u29"}, {"floor": "RDC", "zone": "La Mosqué d'homme", "type": "Cassette", "idx": 3, "qty": 3, "id": "u30"}, {"floor": "RDC", "zone": "La Mosqué de Femme", "type": "Cassette", "idx": 1, "qty": 1, "id": "u31"}, {"floor": "1er etage", "zone": "Salle d'exposition", "type": "Cassette", "idx": 1, "qty": 1, "id": "u32"}, {"floor": "1er etage", "zone": "IT DEP", "type": "Cassette", "idx": 1, "qty": 1, "id": "u33"}, {"floor": "1er etage", "zone": "Salle de validation", "type": "Cassette", "idx": 1, "qty": 2, "id": "u34"}, {"floor": "1er etage", "zone": "Salle de validation", "type": "Cassette", "idx": 2, "qty": 2, "id": "u35"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 1, "qty": 4, "id": "u36"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 2, "qty": 4, "id": "u37"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 3, "qty": 4, "id": "u38"}, {"floor": "1er etage", "zone": "Zone Process", "type": "Cassette", "idx": 4, "qty": 4, "id": "u39"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 1, "qty": 5, "id": "u40"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 2, "qty": 5, "id": "u41"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 3, "qty": 5, "id": "u42"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 4, "qty": 5, "id": "u43"}, {"floor": "1er etage", "zone": "Zone d'ingenieurie", "type": "Cassette", "idx": 5, "qty": 5, "id": "u44"}, {"floor": "1er etage", "zone": "salle IT (serveur)", "type": "Murale", "idx": 1, "qty": 2, "id": "u45"}, {"floor": "1er etage", "zone": "salle IT (serveur)", "type": "Murale", "idx": 2, "qty": 2, "id": "u46"}, {"floor": "1er etage", "zone": "Salle UPS", "type": "Murale", "idx": 1, "qty": 1, "id": "u47"}, {"floor": "1er etage", "zone": "Locale technique 1er etage", "type": "Murale", "idx": 1, "qty": 1, "id": "u48"}, {"floor": "1er etage", "zone": "salle Manager d'ingenieurie", "type": "Cassette", "idx": 1, "qty": 1, "id": "u49"}, {"floor": "1er etage", "zone": "salle de reunion 01", "type": "Cassette", "idx": 1, "qty": 1, "id": "u50"}, {"floor": "1er etage", "zone": "Zone de qualité", "type": "Cassette", "idx": 1, "qty": 3, "id": "u51"}, {"floor": "1er etage", "zone": "Zone de qualité", "type": "Cassette", "idx": 2, "qty": 3, "id": "u52"}, {"floor": "1er etage", "zone": "Zone de qualité", "type": "Cassette", "idx": 3, "qty": 3, "id": "u53"}, {"floor": "1er etage", "zone": "salle Manager de Qualité", "type": "Cassette", "idx": 1, "qty": 1, "id": "u54"}, {"floor": "1er etage", "zone": "Salle de reunion 02", "type": "Cassette", "idx": 1, "qty": 1, "id": "u55"}, {"floor": "1er etage", "zone": "Zone de Logistique", "type": "Cassette", "idx": 1, "qty": 2, "id": "u56"}, {"floor": "1er etage", "zone": "Zone de Logistique", "type": "Cassette", "idx": 2, "qty": 2, "id": "u57"}, {"floor": "1er etage", "zone": "salle Manager Logistique", "type": "Cassette", "idx": 1, "qty": 1, "id": "u58"}, {"floor": "1er etage", "zone": "Salle de reunion 03", "type": "Cassette", "idx": 1, "qty": 2, "id": "u59"}, {"floor": "1er etage", "zone": "Salle de reunion 03", "type": "Cassette", "idx": 2, "qty": 2, "id": "u60"}, {"floor": "1er etage", "zone": "Salle de reunion 04", "type": "Cassette", "idx": 1, "qty": 1, "id": "u61"}, {"floor": "1er etage", "zone": "Salle de reunion 05", "type": "Cassette", "idx": 1, "qty": 1, "id": "u62"}, {"floor": "1er etage", "zone": "salle de Finance", "type": "Cassette", "idx": 1, "qty": 1, "id": "u63"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 1, "qty": 5, "id": "u64"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 2, "qty": 5, "id": "u65"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 3, "qty": 5, "id": "u66"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 4, "qty": 5, "id": "u67"}, {"floor": "1er etage", "zone": "couloir", "type": "Cassette", "idx": 5, "qty": 5, "id": "u68"}, {"floor": "1er etage", "zone": "salle de Plant Manager", "type": "Cassette", "idx": 1, "qty": 1, "id": "u69"}, {"floor": "1er etage", "zone": "Salle de reunion general", "type": "Cassette", "idx": 1, "qty": 2, "id": "u70"}, {"floor": "1er etage", "zone": "Salle de reunion general", "type": "Cassette", "idx": 2, "qty": 2, "id": "u71"}, {"floor": "1er etage", "zone": "espace ouvert PM", "type": "Cassette", "idx": 1, "qty": 3, "id": "u72"}, {"floor": "1er etage", "zone": "espace ouvert PM", "type": "Cassette", "idx": 2, "qty": 3, "id": "u73"}, {"floor": "1er etage", "zone": "espace ouvert PM", "type": "Cassette", "idx": 3, "qty": 3, "id": "u74"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 1, "qty": 4, "id": "u75"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 2, "qty": 4, "id": "u76"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 3, "qty": 4, "id": "u77"}, {"floor": "Locale technique", "zone": "salle Process", "type": "Murale", "idx": 4, "qty": 4, "id": "u78"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 1, "qty": 4, "id": "u79"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 2, "qty": 4, "id": "u80"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 3, "qty": 4, "id": "u81"}, {"floor": "Locale technique", "zone": "salle de coupe (production)", "type": "Murale", "idx": 4, "qty": 4, "id": "u82"}, {"floor": "Locale technique", "zone": "salle de coupe Maintenance", "type": "Murale", "idx": 1, "qty": 2, "id": "u83"}, {"floor": "Locale technique", "zone": "salle de coupe Maintenance", "type": "Murale", "idx": 2, "qty": 2, "id": "u84"}, {"floor": "Locale technique", "zone": "salle d'assemblage", "type": "Murale", "idx": 1, "qty": 2, "id": "u85"}, {"floor": "Locale technique", "zone": "salle d'assemblage", "type": "Murale", "idx": 2, "qty": 2, "id": "u86"}, {"floor": "Locale technique", "zone": "salle crimping", "type": "Murale", "idx": 1, "qty": 2, "id": "u87"}, {"floor": "Locale technique", "zone": "salle crimping", "type": "Murale", "idx": 2, "qty": 2, "id": "u88"}, {"floor": "magasin reception", "zone": "RDC", "type": "Cassette", "idx": 1, "qty": 1, "id": "u89"}, {"floor": "magasin reception", "zone": "Laboratoire de qualité", "type": "Cassette", "idx": 1, "qty": 1, "id": "u90"}, {"floor": "magasin reception", "zone": "teardown room", "type": "Cassette", "idx": 1, "qty": 1, "id": "u91"}, {"floor": "magasin reception", "zone": "Qualité inspection", "type": "Cassette", "idx": 1, "qty": 1, "id": "u92"}, {"floor": "magasin reception", "zone": "CCTV Room", "type": "Murale", "idx": 1, "qty": 1, "id": "u93"}, {"floor": "magasin reception", "zone": "representation des employers", "type": "Murale", "idx": 1, "qty": 1, "id": "u94"}, {"floor": "magasin reception", "zone": "Poste de garde 01", "type": "Murale", "idx": 1, "qty": 1, "id": "u95"}, {"floor": "magasin reception", "zone": "poste de garde 02", "type": "Murale", "idx": 1, "qty": 1, "id": "u96"}, {"floor": "magasin reception", "zone": "salle RH poste de garde", "type": "Murale", "idx": 1, "qty": 1, "id": "u97"}, {"floor": "magasin reception", "zone": "salle archivage zone annex", "type": "Murale", "idx": 1, "qty": 2, "id": "u98"}, {"floor": "magasin reception", "zone": "salle archivage zone annex", "type": "Murale", "idx": 2, "qty": 2, "id": "u99"}, {"floor": "magasin reception", "zone": "Dep. Expedition", "type": "Cassette", "idx": 1, "qty": 1, "id": "u100"}, {"floor": "magasin reception", "zone": "salle déchet de laverie", "type": "Murale", "idx": 1, "qty": 1, "id": "u101"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 1, "qty": 9, "id": "u102"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 2, "qty": 9, "id": "u103"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 3, "qty": 9, "id": "u104"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 4, "qty": 9, "id": "u105"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 5, "qty": 9, "id": "u106"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 6, "qty": 9, "id": "u107"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 7, "qty": 9, "id": "u108"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 8, "qty": 9, "id": "u109"}, {"floor": "Cuisine", "zone": "Cuisine", "type": "Murale", "idx": 9, "qty": 9, "id": "u110"}, {"floor": "Cuisine", "zone": "stockage cuisine", "type": "Murale", "idx": 1, "qty": 2, "id": "u111"}, {"floor": "Cuisine", "zone": "stockage cuisine", "type": "Murale", "idx": 2, "qty": 2, "id": "u112"}, {"floor": "TGBT", "zone": "TGBT", "type": "Murale", "idx": 1, "qty": 2, "id": "u113"}, {"floor": "TGBT", "zone": "TGBT", "type": "Murale", "idx": 2, "qty": 2, "id": "u114"}, {"floor": "Roof Tops", "zone": "RT01 – Reception", "type": "Rooftop", "idx": 1, "qty": null, "id": "u115"}, {"floor": "Roof Tops", "zone": "RT02 – T02", "type": "Rooftop", "idx": 1, "qty": null, "id": "u116"}, {"floor": "Roof Tops", "zone": "RT03 – T10", "type": "Rooftop", "idx": 1, "qty": null, "id": "u117"}, {"floor": "Roof Tops", "zone": "RT04 – T19", "type": "Rooftop", "idx": 1, "qty": null, "id": "u118"}, {"floor": "Roof Tops", "zone": "RT05 – T27", "type": "Rooftop", "idx": 1, "qty": null, "id": "u119"}, {"floor": "Roof Tops", "zone": "RT06 – A06", "type": "Rooftop", "idx": 1, "qty": null, "id": "u120"}, {"floor": "Roof Tops", "zone": "RT07 – A16", "type": "Rooftop", "idx": 1, "qty": null, "id": "u121"}, {"floor": "Roof Tops", "zone": "RT08 – A23", "type": "Rooftop", "idx": 1, "qty": null, "id": "u122"}, {"floor": "Roof Tops", "zone": "RT09 – A31", "type": "Rooftop", "idx": 1, "qty": null, "id": "u123"}, {"floor": "Roof Tops", "zone": "RT10 – Expédition", "type": "Rooftop", "idx": 1, "qty": null, "id": "u124"}, {"floor": "Roof Tops", "zone": "RT11 – Cantine", "type": "Rooftop", "idx": 1, "qty": null, "id": "u125"}, {"floor": "CTA", "zone": "Cuisine", "type": "CTA", "idx": 1, "qty": null, "id": "u126"}, {"floor": "CTA", "zone": "Produit chimie", "type": "CTA", "idx": 1, "qty": null, "id": "u127"}];
+
+const FLOOR_ORDER = ["RDC","1er etage","Locale technique","magasin reception","Cuisine","TGBT","Roof Tops","CTA"];
+const FLOOR_LABELS = {
+  "RDC":"RDC", "1er etage":"1er étage", "Locale technique":"Locale technique",
+  "magasin reception":"Magasin réception", "Cuisine":"Cuisine", "TGBT":"TGBT",
+  "Roof Tops":"Roof Tops", "CTA":"CTA"
+};
+
+let currentFloor = "ALL";
+let viewMode = "list"; // 'list' | 'dashboard'
+let searchQuery = "";
+let collapsedZones = {}; // State storage for expanded/collapsed sections
+
+// --- Pure string date helpers (NO Date/toISOString round-trips -> no timezone drift) ---
+function pad2(n){ return String(n).padStart(2,'0'); }
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+}
+function addDaysStr(dateStr, delta){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d, 12, 0, 0); // noon local, avoids DST edge cases
+  dt.setDate(dt.getDate()+delta);
+  return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+}
+
+let currentDate = todayStr();
+let dayData = {}; // { unitId: {avant:'ON'|'OFF'|null, apres:'ON'|'OFF'|null} }
+
+function storageKey(d){ return "clim-status:"+d; }
+
+async function loadDay(d){
+  try{
+    if (window.storage && typeof window.storage.get === 'function') {
+      const res = await window.storage.get(storageKey(d), true);
+      dayData = res ? JSON.parse(res.value) : {};
+      document.getElementById('saveStat').textContent = res ? "Chargé" : "Aucune donnée enregistrée";
+    } else {
+      const localRes = localStorage.getItem(storageKey(d));
+      dayData = localRes ? JSON.parse(localRes) : {};
+      document.getElementById('saveStat').textContent = localRes ? "Chargé (Local)" : "Aucune donnée enregistrée";
+    }
+  }catch(e){
+    dayData = {};
+    document.getElementById('saveStat').textContent = "ℹ️ Nouveau jour";
+  }
+  render();
+  updateDebug();
+}
+
+function doSave(dateForSave, dataForSave){
+  const key = storageKey(dateForSave);
+  const dataStr = JSON.stringify(dataForSave);
+  
+  if (window.storage && typeof window.storage.set === 'function') {
+    return window.storage.set(key, dataStr, true)
+      .then(()=>{
+        const now = new Date();
+        document.getElementById('saveStat').textContent = "Enregistré à " + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+        updateDebug();
+        return true;
+      })
+      .catch((e)=>{
+        document.getElementById('saveStat').textContent = "❌ Erreur de sauvegarde";
+        return false;
+      });
+  } else {
+    try {
+      localStorage.setItem(key, dataStr);
+      const now = new Date();
+      document.getElementById('saveStat').textContent = "Enregistré (Local) à " + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+      updateDebug();
+      return Promise.resolve(true);
+    } catch (e) {
+      document.getElementById('saveStat').textContent = "❌ Erreur de sauvegarde locale";
+      return Promise.resolve(false);
+    }
+  }
+}
+
+async function scheduleSave(){
+  document.getElementById('saveStat').textContent = "Enregistrement…";
+  await doSave(currentDate, dayData);
+}
+
+async function flushSave(){
+  await doSave(currentDate, dayData);
+}
+
+function updateDebug(){
+  const el = document.getElementById('debugBox');
+  if(el && el.style.display !== 'none'){
+    el.textContent = storageKey(currentDate) + "\n" + JSON.stringify(dayData, null, 1);
+  }
+}
+
+function cycleState(cur){
+  if(cur === null || cur === undefined) return 'ON';
+  if(cur === 'ON') return 'OFF';
+  return null;
+}
+
+function setState(unitId, field, val){
+  if(!dayData[unitId]) dayData[unitId] = {avant:null, apres:null};
+  dayData[unitId][field] = val;
+}
+
+function groupUnits(units){
+  const zones = [];
+  const map = {};
+  units.forEach(u=>{
+    const key = u.floor+"||"+u.zone;
+    if(!map[key]){
+      map[key] = {floor:u.floor, zone:u.zone, qty:u.qty, units:[]};
+      zones.push(map[key]);
+    }
+    map[key].units.push(u);
+  });
+  return zones;
+}
+
+function renderFloorTabs(){
+  const wrap = document.getElementById('floorTabs');
+  wrap.innerHTML = '';
+  const allTab = document.createElement('div');
+  allTab.className = 'floortab' + (currentFloor==='ALL' ? ' active':'');
+  allTab.textContent = 'Tout';
+  allTab.onclick = ()=>{ currentFloor='ALL'; render(); };
+  wrap.appendChild(allTab);
+  FLOOR_ORDER.forEach(f=>{
+    const tab = document.createElement('div');
+    tab.className = 'floortab' + (currentFloor===f ? ' active':'');
+    tab.textContent = FLOOR_LABELS[f] || f;
+    tab.onclick = ()=>{ currentFloor=f; render(); };
+    wrap.appendChild(tab);
+  });
+}
+
+function makeToggle(unitId, field, label){
+  const group = document.createElement('div');
+  group.className = 'switchgroup';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = label;
+  const t = document.createElement('div');
+  t.className = 'toggle';
+  const state = dayData[unitId] ? dayData[unitId][field] : null;
+  t.setAttribute('data-state', state || 'NONE');
+  t.innerHTML = '<div class="half off">OFF</div><div class="half on">ON</div><div class="knob"></div>';
+  t.onclick = async (e)=>{
+    e.stopPropagation(); // Avoid triggering accordion collapse on tap
+    const cur = dayData[unitId] ? dayData[unitId][field] : null;
+    const next = cycleState(cur);
+    t.setAttribute('data-state', next || 'NONE');
+    setState(unitId, field, next);
+    updateDebug();
+    await scheduleSave();
+    updateSummary();
+  };
+  group.appendChild(lbl);
+  group.appendChild(t);
+  return group;
+}
+
+function updateSummary() {
+  let units = UNITS;
+  if(currentFloor !== 'ALL'){
+    units = units.filter(u=>u.floor===currentFloor);
+  }
+  let total=0, on=0, off=0, unset=0;
+  units.forEach(u=>{
+    ['avant','apres'].forEach(f=>{
+      total++;
+      const v = dayData[u.id] ? dayData[u.id][f] : null;
+      if(v==='ON') on++; else if(v==='OFF') off++; else unset++;
+    });
+  });
+  document.getElementById('summaryBar').innerHTML =
+    `<span><b>${units.length}</b> unités</span><span><b>${on}</b> ON</span><span><b>${off}</b> OFF</span><span><b>${unset}</b> non relevés</span>`;
+}
+
+function render(){
+  renderFloorTabs();
+  document.getElementById('datePicker').value = currentDate;
+
+  document.getElementById('tabList').classList.toggle('active', viewMode==='list');
+  document.getElementById('tabDashboard').classList.toggle('active', viewMode==='dashboard');
+  document.getElementById('content').style.display = viewMode==='list' ? '' : 'none';
+  document.getElementById('summaryBar').style.display = viewMode==='list' ? '' : 'none';
+  document.getElementById('filterSection').style.display = viewMode==='list' ? '' : 'none';
+  document.getElementById('dashboardView').style.display = viewMode==='dashboard' ? '' : 'none';
+
+  if(viewMode==='dashboard'){
+    renderDashboard();
+    return;
+  }
+
+  let units = UNITS;
+  if(currentFloor !== 'ALL'){
+    units = units.filter(u=>u.floor===currentFloor);
+  }
+
+  // Filter based on search input
+  if(searchQuery.trim() !== "") {
+    const q = searchQuery.toLowerCase();
+    units = units.filter(u => 
+      u.zone.toLowerCase().includes(q) || 
+      u.floor.toLowerCase().includes(q) || 
+      u.type.toLowerCase().includes(q)
+    );
+  }
+
+  const zones = groupUnits(units);
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  if(zones.length===0){
+    content.innerHTML = '<div class="empty">Aucune zone correspondante.</div>';
+  }
+
+  zones.forEach(z=>{
+    const card = document.createElement('div');
+    const isCollapsed = collapsedZones[z.floor + "||" + z.zone] === true;
+    card.className = 'zonecard' + (isCollapsed ? ' collapsed' : '');
+
+    const head = document.createElement('div');
+    head.className = 'zonehead';
+    head.innerHTML = `
+      <div>
+        <div class="ztitle">${z.zone}</div>
+        <div class="zmeta">${FLOOR_LABELS[z.floor]||z.floor}</div>
+      </div>
+      <div class="zright">
+        <div class="zcount">${z.units.length} U</div>
+        <div class="chevron">▼</div>
+      </div>
+    `;
+    
+    // Toggle Collapse
+    head.onclick = () => {
+      const key = z.floor + "||" + z.zone;
+      collapsedZones[key] = !collapsedZones[key];
+      card.classList.toggle('collapsed');
+    };
+    card.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'zonebody';
+
+    z.units.forEach(u=>{
+      const row = document.createElement('div');
+      row.className = 'unitrow';
+      const label = document.createElement('div');
+      label.className = 'unitlabel';
+      const typeLabel = u.type === 'Rooftop' ? 'Rooftop' : (u.type === 'CTA' ? 'CTA' : u.type);
+      label.innerHTML = `${typeLabel} ${u.type==='Rooftop'||u.type==='CTA' ? '' : '#'+u.idx}<span class="sub">${u.qty ? 'Total zone : '+u.qty+' u.' : ''}</span>`;
+      row.appendChild(label);
+
+      const sw = document.createElement('div');
+      sw.className = 'switches';
+      sw.appendChild(makeToggle(u.id, 'avant', 'Avant'));
+      sw.appendChild(makeToggle(u.id, 'apres', 'Après'));
+      row.appendChild(sw);
+
+      body.appendChild(row);
+    });
+
+    card.appendChild(body);
+    content.appendChild(card);
+  });
+
+  updateSummary();
+}
+
+// Search Input handler
+document.getElementById('searchInput').oninput = (e) => {
+  searchQuery = e.target.value;
+  render();
+};
+
+document.getElementById('prevDay').onclick = async ()=>{
+  await flushSave();
+  currentDate = addDaysStr(currentDate, -1);
+  loadDay(currentDate);
+};
+document.getElementById('nextDay').onclick = async ()=>{
+  await flushSave();
+  currentDate = addDaysStr(currentDate, 1);
+  loadDay(currentDate);
+};
+document.getElementById('todayBtn').onclick = async ()=>{
+  await flushSave();
+  currentDate = todayStr();
+  loadDay(currentDate);
+};
+document.getElementById('datePicker').onchange = async (e)=>{
+  await flushSave();
+  currentDate = e.target.value;
+  loadDay(currentDate);
+};
+
+// ---- Export ----
+document.getElementById('exportBtn').onclick = ()=>{
+  document.getElementById('exportFrom').value = currentDate;
+  document.getElementById('exportTo').value = currentDate;
+  document.getElementById('exportModal').classList.add('open');
+};
+document.getElementById('closeModal').onclick = ()=> document.getElementById('exportModal').classList.remove('open');
+document.getElementById('cancelExport').onclick = ()=> document.getElementById('exportModal').classList.remove('open');
+
+document.getElementById('confirmExport').onclick = async () => {
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  if(!from || !to || from > to){ 
+    alert('Période invalide.'); 
+    return; 
+  }
+
+  const confirmBtn = document.getElementById('confirmExport');
+  confirmBtn.textContent = 'Préparation…';
+  confirmBtn.disabled = true;
+
+  try {
+    await flushSave(); 
+
+    const dates = [];
+    let d = from;
+    while(d <= to){
+      dates.push(d);
+      d = addDaysStr(d, 1);
+    }
+
+    const allDayData = {};
+    
+    // Recovery with localized fallback logic
+    for(const dt of dates){
+      if(dt === currentDate){
+        allDayData[dt] = dayData; 
+        continue;
+      }
+      
+      let parsed = {};
+      const key = storageKey(dt);
+      
+      try {
+        if (window.storage && typeof window.storage.get === 'function') {
+          const res = await window.storage.get(key, true);
+          if (res) {
+            parsed = typeof res.value === 'string' ? JSON.parse(res.value) : (res.value || {});
+          }
+        } else {
+          const localRes = localStorage.getItem(key);
+          if (localRes) {
+            parsed = JSON.parse(localRes);
+          }
+        }
+      } catch(e) {
+        console.warn(`Impossible de charger les données pour le ${dt}:`, e);
+        parsed = {}; 
+      }
+      allDayData[dt] = parsed;
+    }
+
+    const row1 = ['', '', '', ''];
+    const row2 = ['Floor', 'Zone', 'Type', 'Quantity'];
+    dates.forEach(dt => {
+      row1.push(dt, '');
+      row2.push('Avant', 'Après');
+    });
+
+    const rows = [row1, row2];
+    UNITS.forEach(u => {
+      const r = [u.floor, u.zone, u.type, u.qty || ''];
+      dates.forEach(dt => {
+        const rec = allDayData[dt] ? allDayData[dt][u.id] : null;
+        r.push(rec && rec.avant ? rec.avant : '');
+        r.push(rec && rec.apres ? rec.apres : '');
+      });
+      rows.push(r);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!merges'] = dates.map((dt, i) => ({s: {r: 0, c: 4 + i * 2}, e: {r: 0, c: 5 + i * 2}}));
+    ws['!cols'] = [{wch: 16}, {wch: 26}, {wch: 12}, {wch: 10}].concat(dates.flatMap(() => [{wch: 8}, {wch: 8}]));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Suivi des climes');
+    const fname = `Suivi_Climatisation_${from}_a_${to}.xlsx`;
+    XLSX.writeFile(wb, fname);
+
+  } catch(err) {
+    console.error(err);
+    alert('Erreur pendant l\'export : ' + (err && err.message ? err.message : 'Problème inconnu'));
+  } finally {
+    confirmBtn.textContent = 'Télécharger';
+    confirmBtn.disabled = false;
+    document.getElementById('exportModal').classList.remove('open');
+  }
+};
+
+let floorChartInstance = null;
+let trendChartInstance = null;
+
+function computeKPIs(data){
+  let total=0, avantOn=0, avantOff=0, apresOn=0, apresOff=0, unrelevedA=0, unrelevedP=0;
+  UNITS.forEach(u=>{
+    total++;
+    const v = data[u.id];
+    const a = v ? v.avant : null;
+    const p = v ? v.apres : null;
+    if(a==='ON') avantOn++; else if(a==='OFF') avantOff++; else unrelevedA++;
+    if(p==='ON') apresOn++; else if(p==='OFF') apresOff++; else unrelevedP++;
+  });
+  return {total, avantOn, avantOff, apresOn, apresOff, unrelevedA, unrelevedP};
+}
+
+async function renderDashboard(){
+  document.getElementById('dashDateLabel').textContent = "Journée du " + currentDate;
+  const k = computeKPIs(dayData);
+
+  const kpiGrid = document.getElementById('kpiGrid');
+  kpiGrid.innerHTML = `
+    <div class="kpi-card"><div class="kval">${k.total}</div><div class="klabel">Unités totales</div></div>
+    <div class="kpi-card ${k.unrelevedP>0?'alert':''}"><div class="kval">${k.unrelevedP}</div><div class="klabel">Non relevées (Après)</div></div>
+    <div class="kpi-card ${k.apresOn>0?'alert':'good'}"><div class="kval">${k.apresOn}</div><div class="klabel">Laissées ON (Après)</div></div>
+    <div class="kpi-card good"><div class="kval">${k.apresOff}</div><div class="klabel">Éteintes (Après)</div></div>
+  `;
+
+  const floorStats = {};
+  FLOOR_ORDER.forEach(f=> floorStats[f] = {on:0, off:0, unset:0});
+  UNITS.forEach(u=>{
+    const v = dayData[u.id];
+    const p = v ? v.apres : null;
+    if(!floorStats[u.floor]) floorStats[u.floor] = {on:0, off:0, unset:0};
+    if(p==='ON') floorStats[u.floor].on++;
+    else if(p==='OFF') floorStats[u.floor].off++;
+    else floorStats[u.floor].unset++;
+  });
+  const floorLabels = FLOOR_ORDER.map(f=> FLOOR_LABELS[f]||f);
+  const onData = FLOOR_ORDER.map(f=> floorStats[f].on);
+  const offData = FLOOR_ORDER.map(f=> floorStats[f].off);
+  const unsetData = FLOOR_ORDER.map(f=> floorStats[f].unset);
+
+  const ctxFloor = document.getElementById('floorChart').getContext('2d');
+  if(floorChartInstance) floorChartInstance.destroy();
+  floorChartInstance = new Chart(ctxFloor, {
+    type:'bar',
+    data:{
+      labels: floorLabels,
+      datasets:[
+        {label:'ON', data:onData, backgroundColor:'#C53030'},
+        {label:'OFF', data:offData, backgroundColor:'#2F855A'},
+        {label:'Non relevé', data:unsetData, backgroundColor:'#A0AEC0'}
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio: false,
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, font:{size:10}} } },
+      scales:{ x:{stacked:true, ticks:{font:{size:9}}}, y:{stacked:true, beginAtZero:true, ticks:{precision:0}} }
+    }
+  });
+
+  const trendDates = [];
+  for(let i=6;i>=0;i--) trendDates.push(addDaysStr(currentDate, -i));
+  const trendCounts = [];
+  for(const dt of trendDates){
+    let data = {};
+    if(dt===currentDate){ data = dayData; }
+    else{
+      try {
+        if (window.storage && typeof window.storage.get === 'function') {
+          const res = await window.storage.get(storageKey(dt), true);
+          data = res ? JSON.parse(res.value) : {};
+        } else {
+          const localRes = localStorage.getItem(storageKey(dt));
+          data = localRes ? JSON.parse(localRes) : {};
+        }
+      } catch(e) { data = {}; }
+    }
+    const kk = computeKPIs(data);
+    trendCounts.push(kk.apresOn);
+  }
+  const ctxTrend = document.getElementById('trendChart').getContext('2d');
+  if(trendChartInstance) trendChartInstance.destroy();
+  trendChartInstance = new Chart(ctxTrend, {
+    type:'bar',
+    data:{
+      labels: trendDates.map(d=>d.slice(5)),
+      datasets:[{ label:'Laissées ON', data: trendCounts, backgroundColor:'#FF6B35' }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio: false,
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ beginAtZero:true, ticks:{precision:0} } }
+    }
+  });
+}
+
+document.getElementById('tabList').onclick = ()=>{ viewMode='list'; render(); };
+document.getElementById('tabDashboard').onclick = ()=>{ viewMode='dashboard'; render(); };
+
+document.getElementById('debugToggle').onclick = ()=>{
+  const el = document.getElementById('debugBox');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  updateDebug();
+};
+
+// init
+loadDay(currentDate);
+</script>
+</body>
+</html>
